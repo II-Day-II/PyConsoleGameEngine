@@ -152,3 +152,79 @@ class CGE:
             s = f"PyConsoleGameEngine - {self.title} @ FPS: {1 / delta_time}"
             SetConsoleTitle(s)
             WriteConsoleOutput(self.console_handle, self.screen_buffer, wtps._COORD(self.screen_width, self.screen_height), wtps._COORD(0,0), byref(self.rect_window))
+
+    def draw(self, x, y, chr = 0x2588, col = 0x000F):
+        if x >= 0 and x < self.screen_width and y >= 0 and y < self.screen_height:
+            self.screen_buffer[y * self.screen_width + x].Char.UnicodeChar = chr
+            self.screen_buffer[y * self.screen_width + x].Attributes = col
+    
+    def draw_line(self, x1, y1, x2, y2, chr = 0x2588, col = 0x000F):
+        dx = x2 - x1
+        dy = y2 - y1
+        dx1 = abs(dx)
+        dy1 = abs(dy)
+        px = 2 * dy1 - dx1
+        py = 2 * dx1 - dy1
+        if dy1 <= dx1:
+            if dx >= 0:
+                x = x1
+                y = y1
+                xe = x2
+            else:
+                x = x2
+                y = y2
+                xe = x1
+            self.draw(x, y, chr, col)
+            for i in range(xe):
+                x += 1
+                if px < 0:
+                    px += 2 * dy1
+                else:
+                    if (dx < 0 and dy < 0) or (dx > 0 and dy > 0):
+                        y += 1
+                    else:
+                        y -= 1
+                    px += 2 * (dy1 - dx1)
+                self.draw(x, y, chr, col)
+        else:
+            if dy >= 0:
+                x = x1
+                y = y1
+                ye = y2
+            else:
+                x = x2
+                y = y2
+                ye = y1
+            self.draw(x, y, chr, col)
+            for i in range(ye):
+                y += 1
+                if py <= 0:
+                    py += 2 * dx1
+                else:
+                    if (dx < 0 and dy < 0) or (dx > 0 and dy > 0):
+                        x += 1
+                    else:
+                        x -= 1
+                    py += 2 * (dx1 - dy1)
+                self.draw(x, y, chr, col)
+
+    def draw_triangle(self, x1, y1, x2, y2, x3, y3, chr = 0x2588, col = 0x000F):
+        self.draw_line(x1, y1, x2, y2, chr, col)
+        self.draw_line(x2, y2, x3, y3, chr, col)
+        self.draw_line(x3, y3, x1, y1, chr, col)
+
+    def draw_string(self, x, y, st, col = 0x000F):
+        for i, ch in enumerate(st):
+            self.screen_buffer[y * self.screen_width + x + i ].Char.UnicodeChar = ch
+            self.screen_buffer[y * self.screen_width + x + i].Attributes = col
+
+    def clip(self, x, y):
+        if x < 0:
+            x = 0
+        elif x >= self.screen_width:
+            x = self.screen_width
+        if y < 0:
+            y = 0
+        elif y >= self.screen_height:
+            y = self.screen_height
+        return x, y
