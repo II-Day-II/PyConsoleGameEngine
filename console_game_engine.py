@@ -19,7 +19,7 @@ SetConsoleActiveScreenBuffer = windll.kernel32.SetConsoleActiveScreenBuffer
 SetCurrentConsoleFontEx = windll.kernel32.SetCurrentConsoleFontEx
 SetConsoleCtrlHandler = windll.kernel32.SetConsoleCtrlHandler
 WriteConsoleOutput = windll.kernel32.WriteConsoleOutputW
-SetConsoleTitle = windll.kernel32.SetConsoleTitle
+#SetConsoleTitle = windll.kernel32.SetConsoleTitle
 
 class CONSOLE_FONT_INFOEX(Structure):
     _fields_ = [
@@ -64,7 +64,7 @@ class CGE:
         # self.sound = False
         self.active = False
 
-    def CloseHandler(self, evt):
+    def close_handler(self, evt):
         if evt == CTRL_CLOSE_EVENT or evt == CTRL_C_EVENT:
             self.active = False
             # wait for thread or something here
@@ -117,14 +117,16 @@ class CGE:
         #set console mode to enable mouse here
 
         # allocate screen buffer
-        self.screen_buffer = [CHAR_INFO()] * self.screen_height * self.screen_width
+        self.screen_buffer = [CHAR_INFO()] * (self.screen_height * self.screen_width)
 
         # set a close handler or something???
         SetConsoleCtrlHandler(PHANDLER_ROUTINE(self.close_handler), True)
 
     def on_user_create(self):
+        print("on_user_create must be overridden")
         return False #self.Error("on_user_create must be overridden!!!!")
     def on_user_update(self, delta_time):
+        print("on_user_update must be overridden")
         return False #self.Error("on_user_update must be overridden!!!!")
 
     def start(self):
@@ -135,6 +137,7 @@ class CGE:
     
     def game_thread(self):
         if not self.on_user_create():
+            print("onusercreate failed")
             self.active = False
         tp1 = perf_counter()
         tp2 = perf_counter()
@@ -150,15 +153,22 @@ class CGE:
                 self.active = False
 
             s = f"PyConsoleGameEngine - {self.title} @ FPS: {1 / delta_time}"
-            SetConsoleTitle(s)
-            WriteConsoleOutput(self.console_handle, self.screen_buffer, wtps._COORD(self.screen_width, self.screen_height), wtps._COORD(0,0), byref(self.rect_window))
+            #SetConsoleTitle(s)
+            WriteConsoleOutput(self.console_handle, (CHAR_INFO * len(self.screen_buffer))(*self.screen_buffer), wtps._COORD(self.screen_width, self.screen_height), wtps._COORD(0,0), byref(self.rect_window))
 
-    def draw(self, x, y, chr = 0x2588, col = 0x000F):
+    def draw(self, x, y, chr = chr(0x2588), col = 0x000F):
         if x >= 0 and x < self.screen_width and y >= 0 and y < self.screen_height:
-            self.screen_buffer[y * self.screen_width + x].Char.UnicodeChar = chr
-            self.screen_buffer[y * self.screen_width + x].Attributes = col
+            self.screen_buffer[(y * self.screen_width + x) % len(self.screen_buffer)].Char.UnicodeChar = chr
+            self.screen_buffer[(y * self.screen_width + x) % len(self.screen_buffer)].Attributes = col
     
-    def draw_line(self, x1, y1, x2, y2, chr = 0x2588, col = 0x000F):
+    def fill(self, x1, y1, x2, y2, chr = chr(0x2588), col = 0x000F):
+        x1, y1 = self.clip(x1, y1)
+        x2, y2 = self.clip(x2, y2)
+        for y in range(y1, y2):
+            for x in range(x1, x2):
+                self.draw(x, y, chr, col)
+
+    def draw_line(self, x1, y1, x2, y2, chr = chr(0x2588), col = 0x000F):
         dx = x2 - x1
         dy = y2 - y1
         dx1 = abs(dx)
@@ -208,15 +218,15 @@ class CGE:
                     py += 2 * (dx1 - dy1)
                 self.draw(x, y, chr, col)
 
-    def draw_triangle(self, x1, y1, x2, y2, x3, y3, chr = 0x2588, col = 0x000F):
+    def draw_triangle(self, x1, y1, x2, y2, x3, y3, chr = chr(0x2588), col = 0x000F):
         self.draw_line(x1, y1, x2, y2, chr, col)
         self.draw_line(x2, y2, x3, y3, chr, col)
         self.draw_line(x3, y3, x1, y1, chr, col)
 
     def draw_string(self, x, y, st, col = 0x000F):
         for i, ch in enumerate(st):
-            self.screen_buffer[y * self.screen_width + x + i ].Char.UnicodeChar = ch
-            self.screen_buffer[y * self.screen_width + x + i].Attributes = col
+            self.screen_buffer[(y * self.screen_width + x + i) % len(self.screen_buffer)].Char.UnicodeChar = ch
+            self.screen_buffer[(y * self.screen_width + x + i) % len(self.screen_buffer)].Attributes = col
 
     def clip(self, x, y):
         if x < 0:
